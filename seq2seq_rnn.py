@@ -564,5 +564,3 @@ def load_seq2seq_model():
     decoder.load_state_dict(torch.load('seq2seq_decoder.dict'))
     
     evaluate_randomly(encoder1, attn_decoder1)
-
-train_seq2seq_model()
