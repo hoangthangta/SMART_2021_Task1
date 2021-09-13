@@ -35,8 +35,10 @@ lemmatizer = nlp.vocab.morphology.lemmatizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 word2vec_size = 300
-SOS_token = [0]*word2vec_size
-EOS_token = [1]*word2vec_size
+SOS_token = 0
+EOS_token = 1
+#SOS_token = [0]*word2vec_size
+#EOS_token = [1]*word2vec_size
 
 MAX_LENGTH = 256
 RANDOM_SEED = 42
@@ -44,7 +46,7 @@ EPOCHS = 10
 teacher_forcing_ratio = 0.5
 hidden_size = 256
 
-word2vec_model = load_pretrained_word2vec('D:/wiki-news-300d-1M.vec', 100000)
+#word2vec_model = load_pretrained_word2vec('D:/wiki-news-300d-1M.vec', 100000)
 
 class Lang:
     def __init__(self, name):
@@ -53,20 +55,19 @@ class Lang:
         self.word2count = {}
         self.index2word = {0: "SOS", 1: "EOS"}
         self.n_words = 2  # Count SOS and EOS
-        self.word2vector = {}
+        #self.word2vector = {}
 
     def addSentence(self, sentence):
-
-        doc = nlp(sentence)
-        for token in doc: self.addWord(token.text)
-        #for word in sentence.split(' '): self.addWord(word)
+        '''doc = nlp(sentence)
+        for token in doc: self.addWord(token.text)'''
+        for word in sentence.split(' '): self.addWord(word)
 
     def addWord(self, word):
         if word not in self.word2index:
             self.word2index[word] = self.n_words
 
-            try: self.word2vector[word] = word2vec_model['word']
-            except: pass
+            '''try: self.word2vector[word] = word2vec_model['word']
+            except: pass'''
         
             self.word2count[word] = 1
             self.index2word[self.n_words] = word
@@ -89,7 +90,7 @@ def normalizeString(s):
     s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
     return s
 
-def readLangs(lang1, lang2, reverse=False, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//text_dataset.json'):
+def readLangs(lang1, lang2, reverse=False, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_flatten.json'):
     print("Reading file...")
     
     pairs = []
@@ -208,14 +209,14 @@ class AttnDecoderRNN(nn.Module):
         return torch.zeros(1, 1, self.hidden_size, device=device)
 
 def indexesFromSentence(lang, sentence):
-    #return [lang.word2index[word] for word in sentence.split(' ')]
-
-    doc = nlp(sentence)
-    return [lang.word2index[token.text] for token in doc]
+    '''doc = nlp(sentence)
+    return [lang.word2index[token.text] for token in doc]'''
+    return [lang.word2index[word] for word in sentence.split(' ')]
 
 def vectorsFromSentence(lang, sentence):
     doc = nlp(sentence)
     return [lang.word2vector[token.text] for token in doc]
+
 
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
@@ -529,7 +530,7 @@ def evaluate_randomly(encoder, decoder, n=5):
         print('<', output_sentence)
         print('')
 
-def train_seq2seq_model(n_iters = 100000, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//text_dataset.json'):
+def train_seq2seq_model(n_iters = 100000, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_flatten.json'):
 
     # read dataset
     input_lang, output_lang, pairs = readLangs('question', 'type_string', reverse=False)

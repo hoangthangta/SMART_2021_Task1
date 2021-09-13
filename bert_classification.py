@@ -1,4 +1,6 @@
-# https://curiousily.com/posts/sentiment-analysis-with-bert-and-hugging-face-using-pytorch-and-python/
+# Bert classification
+# This code is followed the article: "Sentiment Analysis with BERT and Transformers by Hugging Face using PyTorch and Python"
+# with some adaptations
 
 from read_write_file import *
 import random
@@ -21,8 +23,8 @@ import gc
 
 
 # configuration .............................
-MAX_LEN = 192
-BATCH_SIZE = 8
+MAX_LEN = 192 # 160 or 256 can be considered
+BATCH_SIZE = 8 # should not be larger 16 due to the low RAM
 RANDOM_SEED = 42
 EPOCHS = 10
 #rcParams['figure.figsize'] = 12, 8
