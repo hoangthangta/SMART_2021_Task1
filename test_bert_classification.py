@@ -30,32 +30,40 @@ def type_by_question(dataset, classifier_type = 'type', split = False, first_ite
                     else: type_dict[t] += 1     
 
     type_dict = dict(sorted(type_dict.items(), key = lambda x: x[1], reverse = True))
-    
     return type_dict
-
-# prepare dataset............................
-dataset = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train.json')
-
-# oversampling on boolean and literal questions
-#dataset2 = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_extension.json', False)
-#dataset = dataset + dataset2
-#............................................
-
 
 # train......................................
 mode = 'train' # train or validate
-classifier_type = 'category' # category or type
+classifier_type = 'type' # category or type
 pretrained_model = 'bert-base-cased' # can try with different BERT models
-
 corpus = 'wikidata' # or dbpedia (important!!!)
+#............................................
+
+# prepare dataset............................
+
+if (classifier_type == 'category'):
+    dataset = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train.json')
+    # oversampling on boolean and literal questions
+    #dataset2 = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_extension.json', False)
+    #dataset = dataset + dataset2
+
+else:
+    dataset = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_flatten.json', False)
+    
+#............................................
 
 if (mode == 'train'):
     dataset_trained = dataset
     write_list_to_json_file('smart2021-AT_Answer_Type_Prediction//' + corpus + '//dataset_trained_' + classifier_type + '.json',
                             dataset_trained, 'w')
 
+    type_dict = type_by_question(dataset_trained, classifier_type)
+        
+    #class_names = [item[0] for item in type_by_question(dataset_trained, classifier_type)]
     class_names = sorted(list(set([item[0] for item in type_by_question(dataset_trained, classifier_type)])), key = lambda x: x)
-    print('class_names before training: ', class_names)
+    class_names = [c.strip() for c in class_names if c.strip() != '']
+    
+    print('class_names before training: ', class_names, len(class_names))
 
     write_list_to_json_file('smart2021-AT_Answer_Type_Prediction//' + corpus + '//class_names_' + classifier_type + '.json',
                             class_names, 'w')
@@ -69,7 +77,9 @@ else:
     
     class_names = load_list_from_json_file('smart2021-AT_Answer_Type_Prediction//' + corpus + '//class_names_'
                                            + classifier_type + '.json')
-    class_names = [c[0] for c in class_names]
+
+    #if (classifier_type == 'type'):
+    #class_names = [c for c in class_names]
     
     validate_dataset(dataset_trained, class_names, pretrained_model = pretrained_model,
                      saved_model_file = 'best_bert_model_state.bin',
