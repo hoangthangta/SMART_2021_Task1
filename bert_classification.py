@@ -360,7 +360,7 @@ def show_confusion_matrix(confusion_matrix):
     hmap.yaxis.set_ticklabels(hmap.yaxis.get_ticklabels(), rotation=0, ha='right')
     hmap.xaxis.set_ticklabels(hmap.xaxis.get_ticklabels(), rotation=30, ha='right')
     plt.ylabel('True sentiment')
-    plt.xlabel('Predicted sentiment');
+    plt.xlabel('Predicted sentiment')
     
  
 def validate_dataset(dataset, class_names = [],
