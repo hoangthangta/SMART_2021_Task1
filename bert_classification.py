@@ -26,7 +26,7 @@ import gc
 MAX_LEN = 192 # 160 or 256 can be considered
 BATCH_SIZE = 8 # should not be larger 16 due to the low RAM
 RANDOM_SEED = 42
-EPOCHS = 10
+EPOCHS = 15
 #rcParams['figure.figsize'] = 12, 8
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
@@ -109,8 +109,10 @@ def search_type_index_from_class_names(type_list, class_names):
     
     for index, c in enumerate(class_names):
         c_list = c
+        
         if (type(c) is tuple): c_list = [*c]
         else: c_list = [c_list]
+        
         #print('-- c_list: ', c_list)
         n_intersection = len(set(c_list).intersection(set(type_list)))
         #print('-- n_intersection: ', n_intersection)
@@ -118,19 +120,17 @@ def search_type_index_from_class_names(type_list, class_names):
 
     return -1
 
-def create_data_loader(dataset, tokenizer, class_names, max_len, batch_size, classifier_type = 'type'):
+def create_data_loader(dataset, tokenizer, class_names, max_len, batch_size, classifier_type = 'category_string'):
 
     sentences = []
     categories = []
 
     #print('class_names: ', class_names)
     for item in dataset:
-        
-        item_classifier = []
-        if (classifier_type == 'category'): item_classifier = [item[classifier_type]]
-        else: item_classifier = item[classifier_type]
 
+        item_classifier = [item[classifier_type]]
         #print('item_classifier: ', item_classifier)
+
         index = search_type_index_from_class_names(item_classifier, class_names)
         #print('-- index: ', index)
         if (index == -1): continue
@@ -256,8 +256,11 @@ def convert_dataset_to_bert_tokenizer(dataset, tokenizer, out_file_name = 'bert_
 
 def train_bert_model(dataset, class_names = [], pretrained_model = 'bert-base-cased' ,
                      saved_model_file = 'best_model_state.bin', saved_history_file = 'history_file.json',
-                     classifier_type = 'category', threshold_val_acc = 0.96):
+                     classifier_type = 'category_string', threshold_val_acc = 0.9998):
 
+    # shuffle dataset
+    random.shuffle(dataset)
+    
     # prepare dataset
     tokenizer = BertTokenizer.from_pretrained(pretrained_model)
  
@@ -326,7 +329,83 @@ def train_bert_model(dataset, class_names = [], pretrained_model = 'bert-base-ca
         
         torch.cuda.empty_cache()
         gc.collect()
+
+def pretrain_bert_model(dataset, class_names = [], pretrained_model = 'bert-base-cased' ,
+                     saved_model_file = 'best_model_state.bin', saved_history_file = 'history_file.json',
+                     classifier_type = 'category', threshold_val_acc = 0.9998):
+
+    # random dataset
+    random.shuffle(dataset)
     
+    # prepare dataset
+    tokenizer = BertTokenizer.from_pretrained(pretrained_model)
+ 
+    df_train, df_test = train_test_split(dataset, test_size=0.2, random_state=RANDOM_SEED)
+    df_val, df_test = train_test_split(df_test, test_size=0.5, random_state=RANDOM_SEED)
+    
+    print('df_train, df_test: ', len(df_train), len(df_test))
+    print('df_val, df_test: ', len(df_val), len(df_test))
+
+    train_data_loader = create_data_loader(df_train, tokenizer, class_names, MAX_LEN, BATCH_SIZE, classifier_type)
+    val_data_loader = create_data_loader(df_val, tokenizer, class_names, MAX_LEN, BATCH_SIZE, classifier_type)
+    test_data_loader = create_data_loader(df_test, tokenizer, class_names, MAX_LEN, BATCH_SIZE, classifier_type)
+
+    # create model
+    model = CategoryClassifier(len(class_names), pretrained_model)
+    model.load_state_dict(torch.load(saved_model_file))
+    model = model.to(device)
+
+    data = next(iter(train_data_loader))
+    input_ids = data['input_ids'].to(device)
+    attention_mask = data['attention_mask'].to(device)
+    #F.softmax(model(input_ids, attention_mask), dim=1)
+    
+    optimizer = AdamW(model.parameters(), lr=2e-5, correct_bias=False)
+    total_steps = len(train_data_loader) * EPOCHS
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=0,
+        num_training_steps=total_steps
+        )
+    loss_fn = nn.CrossEntropyLoss().to(device)
+
+    history = defaultdict(list)
+    best_accuracy = 0
+
+    for epoch in range(EPOCHS):
+        print(f'Epoch {epoch + 1}/{EPOCHS}')
+        print('-' * 10)
+
+        train_acc, train_loss = train_epoch(model, train_data_loader, loss_fn, optimizer, device, scheduler, len(df_train))
+        print(f'Train loss {train_loss} accuracy {train_acc}')
+        val_acc, val_loss = eval_model(model, val_data_loader, loss_fn, device, len(df_val))
+
+        print(f'Val loss {val_loss} accuracy {val_acc}')
+        print()
+        history['train_acc'].append(train_acc)
+        history['train_loss'].append(train_loss)
+        history['val_acc'].append(val_acc)
+        history['val_loss'].append(val_loss)
+      
+        if val_acc > best_accuracy:
+            torch.save(model.state_dict(), saved_model_file)
+            best_accuracy = val_acc
+
+        # save history step
+        print('val_acc: ', val_acc)
+        print('train_acc: ', train_acc)
+
+        history_dict = {}
+        history_dict['train_acc'] = train_acc.item()
+        history_dict['train_loss'] = train_loss
+        history_dict['val_acc'] = val_acc.item()
+        history_dict['val_loss'] = val_loss
+        write_single_dict_to_json_file(saved_history_file, history_dict)
+
+        #if (val_acc.item() > threshold_val_acc): break
+        
+        torch.cuda.empty_cache()
+        gc.collect()    
 
 def rebalance_dataset_by_baseline_method(dataset):
 
@@ -381,8 +460,6 @@ def validate_dataset(dataset, class_names = [],
     model.load_state_dict(torch.load(saved_model_file))
     model = model.to(device)
     
-    test_acc, _ = eval_model(model, test_data_loader, loss_fn, device, len(df_test))
-    test_acc.item()
 
     y_texts, y_pred, y_pred_probs, y_test = get_predictions(model, test_data_loader)
     print('y_pred: ', y_pred)
@@ -390,6 +467,9 @@ def validate_dataset(dataset, class_names = [],
     print('class_names: ', class_names)
     
     print(classification_report(y_test, y_pred, target_names=class_names))
+    
+    test_acc, _ = eval_model(model, test_data_loader, loss_fn, device, len(df_test))
+    print('test_acc: ', test_acc.item())
 
     # confusion matrix
     '''cm = confusion_matrix(y_test, y_pred)
@@ -412,9 +492,73 @@ def predict_single_question(question, tokenizer, model):
     attention_mask = encoded_question['attention_mask'].to(device)
     output = model(input_ids, attention_mask)
     _, prediction = torch.max(output, dim=1)
-    print(f'Question: {question}')
-    print(f'Category: {class_names[prediction]}')
+    #print(f'Question: {question}')
+    #print(f'Category: {class_names[prediction]}')
+    return prediction
 
 
+def predict_dataset_bert(dataset, class_names, classifier_type = 'category',
+                    pretrained_model = 'bert-base-cased',
+                    model_file_name = 'best_bert_model_state_category_string.bin',
+                    out_file_name = 'wikidata//task1_wikidata_test_pred.json'):
+
+    tokenizer = BertTokenizer.from_pretrained(pretrained_model)
+    model = CategoryClassifier(len(class_names), pretrained_model)
+    model.load_state_dict(torch.load(model_file_name))
+    model = model.to(device)
+
+    data_list = []
+    for item in dataset:
+
+        if (item['question'] is None or item['question'].strip() == ''):
+            item['category'] = ''
+            item['type'] = []
+        else:
+
+            index_pred = predict_single_question(item['question'], tokenizer, model)
+            name_pred = class_names[index_pred]
+
+            if (classifier_type == 'category_string'):
+                if (name_pred == 'boolean'):
+                    item['category'] = 'boolean'
+                    item['type'] = ['boolean']
+                elif('literal,' in name_pred):
+                    item['category'] = 'literal'
+                    item['type'] = [name_pred.split(',')[1]]
+                else:
+                    item['category'] = name_pred
+                
+            else:
+  
+                if (item['category'] != 'boolean' and item['category'] != 'literal'):
+
+                    name_pred_list = name_pred.split(",")
+                    name_pred_list = [n.strip() for n in name_pred_list if n.strip() != '']
+                    item['type'] = name_pred_list
+
+        data_list.append(item)
+    
+    # write dict
+    write_list_to_json_file(out_file_name, data_list, 'w')
+
+def predict_single_type(question, class_names, classifier_type = 'category',
+                    pretrained_model = 'bert-base-cased',
+                    model_file_name = 'best_bert_model_state_category_string.bin',
+                    out_file_name = 'wikidata//task1_wikidata_test_pred.json'):
+
+    tokenizer = BertTokenizer.from_pretrained(pretrained_model)
+    model = CategoryClassifier(len(class_names), pretrained_model)
+    model.load_state_dict(torch.load(model_file_name))
+    model = model.to(device)
+
+    data_list = []
+
+
+    index_pred = predict_single_question(question, tokenizer, model)
+    name_pred = class_names[index_pred]
+
+    print('question: ', question)
+    print('index_pred: ', index_pred)
+    print('name_pred: ', name_pred)
 
 

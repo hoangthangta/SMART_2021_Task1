@@ -42,7 +42,7 @@ EOS_token = 1
 
 MAX_LENGTH = 256
 RANDOM_SEED = 42
-EPOCHS = 10
+EPOCHS = 20
 teacher_forcing_ratio = 0.5
 hidden_size = 256
 
@@ -90,15 +90,31 @@ def normalizeString(s):
     s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
     return s
 
-def readLangs(lang1, lang2, reverse=False, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_flatten.json'):
+def readLangs(lang1, lang2, reverse=False, dataset_file = 'wikidata//task1_wikidata_rare_resource.json'):
+
     print("Reading file...")
     
     pairs = []
-    dataset = load_list_from_json_file(dataset_file, False)
+    dataset = []
+
+    print('dataset_file: ', dataset_file)
+
+    try:
+        dataset = load_list_from_json_file(dataset_file, True)
+        if (len(dataset) == 0):
+            dataset = load_list_from_json_file(dataset_file, False)
+    except:
+        dataset = load_list_from_json_file(dataset_file, False)
+        if (len(dataset) == 0):
+            dataset = load_list_from_json_file(dataset_file, True)
+        pass
 
     # We do not normalize question texts here!!!
-    for item in dataset: pairs.append([item['question'], item['type_string'], item['type']]) # triples
-    print('Pairs: ', pairs)
+    for item in dataset:
+        #print('---', item)
+        pairs.append([item['question'], item['type_string'], item['type']]) # triples
+
+    #print('Pairs: ', pairs)
 
     # Reverse pairs, make Lang instances
     if reverse:
@@ -112,9 +128,14 @@ def readLangs(lang1, lang2, reverse=False, dataset_file = 'smart2021-AT_Answer_T
     return input_lang, output_lang, pairs
 
 def filterPair(p):
-    return len(p[0].split(' ')) < MAX_LENGTH and \
-        len(p[1].split(' ')) < MAX_LENGTH
 
+    result = False
+    try:
+        result  = len(p[0].split(' ')) < MAX_LENGTH and len(p[1].split(' ')) < MAX_LENGTH
+    except:
+        pass
+    
+    return result
 
 def filterPairs(pairs):
     return [pair for pair in pairs if filterPair(pair)]
@@ -211,7 +232,16 @@ class AttnDecoderRNN(nn.Module):
 def indexesFromSentence(lang, sentence):
     '''doc = nlp(sentence)
     return [lang.word2index[token.text] for token in doc]'''
-    return [lang.word2index[word] for word in sentence.split(' ')]
+
+    index_list = []
+    for word in sentence.split(' '):
+        try:
+            index_list.append(lang.word2index[word])
+        except:
+            pass
+
+    #return [lang.word2index[word] for word in sentence.split(' ')]
+    return index_list
 
 def vectorsFromSentence(lang, sentence):
     doc = nlp(sentence)
@@ -353,8 +383,12 @@ def showPlot(points):
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
     
-def trainIters(encoder, decoder, n_iters, input_lang, output_lang, pairs,
-               input_lang_eval, output_lang_eval, pairs_eval, epochs = EPOCHS, print_every=1000, plot_every=100, learning_rate=0.01):
+def trainIters(encoder, decoder, n_iters,
+               input_lang, output_lang, pairs,
+               input_lang_eval, output_lang_eval, pairs_eval,
+               input_lang_test, output_lang_test, pairs_test,
+               corpus = 'wikidata', epochs = EPOCHS, print_every=1000,
+               plot_every=100, learning_rate=0.01):
 
     start = time.time()
     plot_losses = []
@@ -375,6 +409,8 @@ def trainIters(encoder, decoder, n_iters, input_lang, output_lang, pairs,
 
     #loss_list = []
     best_val_acc = 0
+
+    write_to_new_text_file('seq2seq_history_' + corpus + '.json', '') # write new empty file
     
     for epoch in range(1, epochs + 1):
 
@@ -408,6 +444,12 @@ def trainIters(encoder, decoder, n_iters, input_lang, output_lang, pairs,
                 plot_losses.append(plot_loss_avg)
                 plot_loss_total = 0
 
+        train_acc = evaluate_acc(pairs, input_lang, output_lang,
+                      encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
+        
+        test_acc = evaluate_acc(pairs_test, input_lang_test, output_lang_test,
+                      encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
+        
         
         val_acc, total_val_loss, val_loss = evaluate_pair_val(pairs_eval, input_lang_eval, output_lang_eval,
                       encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
@@ -419,25 +461,29 @@ def trainIters(encoder, decoder, n_iters, input_lang, output_lang, pairs,
         print('-- epoch_avg_loss: ', epoch_avg_loss)
         print('--- val_acc: ', val_acc)
         print('--- val_loss: ', val_loss)
+        print('--- train_acc: ', train_acc)
+        print('--- test_acc: ', test_acc)
         
         #loss_list.append({'loss': epoch_loss})
 
         # save the best model
         if (val_acc > best_val_acc):
-            torch.save(encoder.state_dict(), 'seq2seq_encoder.dict')
-            torch.save(decoder.state_dict(), 'seq2seq_decoder.dict')
+            torch.save(encoder.state_dict(), 'seq2seq_encoder_' + corpus + '.dict')
+            torch.save(decoder.state_dict(), 'seq2seq_decoder_' + corpus + '.dict')
             best_val_acc = val_acc
 
         # save history  
         item_loss_dict = {
             'epoch': str(epoch),
+            'train_acc': train_acc,
             'total_loss': epoch_loss,
             'avg_loss': epoch_avg_loss,
             'val_acc': val_acc,
             'total_val_loss': total_val_loss,
-            'avg_val_loss': val_loss
+            'avg_val_loss': val_loss,
+            'test_acc': test_acc
             }
-        write_single_dict_to_json_file('seq2seq_history.json', item_loss_dict)
+        write_single_dict_to_json_file('seq2seq_history_' + corpus + '.json', item_loss_dict)
 
         gc.collect()
 
@@ -475,6 +521,38 @@ def evaluate(encoder, decoder, input_lang, output_lang, sentence, max_length=MAX
             decoder_input = topi.squeeze().detach()
 
         return decoded_words, decoder_attentions[:di + 1]
+
+def evaluate_acc(pair_set, input_lang, output_lang,
+                      encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
+
+    correct_predictions = 0
+    for i in range(len(pair_set)):
+        pair = pair_set[i]
+        #print('>', pair[0])
+        #print('=', pair[1])
+        output_words, attentions = evaluate(encoder, decoder, input_lang, output_lang, pair[0])
+
+        output_sentence = ' '.join(output_words)
+        output_sentence = output_sentence.replace('<EOS>', '').strip()
+        #print('output_sentence:', output_sentence, output_words)
+
+        pred_type_list = output_sentence.split(',')
+        pred_type_list = [p.strip() for p in pred_type_list if p.strip() != 0]
+        
+        origin_type_list = pair[2]
+        origin_type_list = [o.strip() for o in origin_type_list if o.strip() != 0]
+        
+        #common_items = set(pred_type_list).intersection(set(origin_type_list))
+
+        subset_flag = False
+        try:
+            subset_flag = set(pred_type_list).issubset(set(origin_type_list))
+        except:
+            pass
+        
+        if (subset_flag == True): correct_predictions += 1
+    
+    return correct_predictions / len(pair_set)
 
 def evaluate_pair_val(pair_val, input_lang, output_lang,
                       encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
@@ -520,7 +598,7 @@ def evaluate_pair_val(pair_val, input_lang, output_lang,
     return correct_predictions / len(pair_val), total_val_loss, total_val_loss / len(pair_val)
 
 
-def evaluate_randomly(encoder, decoder, n=5):
+def evaluate_randomly(pairs, encoder, decoder, n=5):
     for i in range(n):
         pair = random.choice(pairs)
         print('>', pair[0])
@@ -530,38 +608,102 @@ def evaluate_randomly(encoder, decoder, n=5):
         print('<', output_sentence)
         print('')
 
-def train_seq2seq_model(n_iters = 100000, dataset_file = 'smart2021-AT_Answer_Type_Prediction//wikidata//task1_wikidata_train_flatten.json'):
+def predict_single_sentence(encoder, decoder, input_lang, output_lang, sentence):
+  
+    output_words, attentions = evaluate(encoder, decoder, input_lang, output_lang, sentence)
+    output_sentence = ' '.join(output_words)
+    return output_sentence
+
+def train_seq2seq_model(n_iters = 100000,
+                        dataset_file = 'wikidata\\task1_wikidata_rare_resource_duplicate.json',
+                        corpus = 'wikidata'):
 
     # read dataset
-    input_lang, output_lang, pairs = readLangs('question', 'type_string', reverse=False)
+    input_lang, output_lang, pairs = readLangs('question', 'type_string', reverse=False, dataset_file = dataset_file)
+
+    # shuffle pairs
+    random.shuffle(pairs)
 
     # split datasets
     pair_train, pair_test = train_test_split(pairs, test_size=0.2, random_state=RANDOM_SEED)
     pair_val, pair_test = train_test_split(pair_test, test_size=0.5, random_state=RANDOM_SEED)
-
-    n_iters = len(pair_train)
-
-    print('pair_train, pair_test: ', len(pair_train), len(pair_test))
+    print('pair_train, pair_test: ', len(pair_train), len(pair_val))
     print('pair_val, pair_test: ', len(pair_val), len(pair_test))
 
     # prepare train data
-    input_lang, output_lang, pairs = prepareData(input_lang, output_lang, pair_train)
+
+    # convert back to json dict
+    saved_pairs = []
+    for item in pair_train + pair_val + pair_test:
+        saved_pairs.append({'question': item[0], 'type_string': item[1] , 'type': item[2]})
+    write_list_to_json_file(corpus + '//seq2seq_train.json', saved_pairs, 'w')
+
+    # train all data
+    input_lang, output_lang, pairs = prepareData(input_lang, output_lang, pair_train + pair_val + pair_test)
     print(random.choice(pairs))
 
+    # set the size of n_iters
+    n_iters = len(pairs)
+
     input_lang_eval, output_lang_eval, pairs_eval = prepareData(input_lang, output_lang, pair_val)
+    input_lang_test, output_lang_test, pairs_test = prepareData(input_lang, output_lang, pair_test)
     
     encoder1 = EncoderRNN(input_lang.n_words, hidden_size).to(device)
     attn_decoder1 = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
 
-    trainIters(encoder1, attn_decoder1, n_iters, input_lang, output_lang, pairs, input_lang_eval, output_lang_eval, pairs_eval)
+    trainIters(encoder1, attn_decoder1, n_iters, input_lang, output_lang, pairs, input_lang_eval, output_lang_eval, pairs_eval,
+               input_lang_test, output_lang_test, pairs_test, corpus = corpus)
     
 
-def load_seq2seq_model():
+def load_seq2seq_model(input_lang = 'question', output_lang = 'type_string',
+                       encoder_file = 'seq2seq_encoder.dict', decoder_file = 'seq2seq_decoder.dict', corpus = 'wikidata'):
 
+   
+    input_lang, output_lang, pair_input = readLangs('question',
+                                                    'type_string',
+                                                    reverse=False,
+                                                    dataset_file = corpus + '//seq2seq_train.json')
+    
+    input_lang, output_lang, pairs = prepareData(input_lang, output_lang, pair_input)
+
+    #print('input_lang: ', input_lang)
+    #print('output_lang: ', output_lang)
+    #print('pairs: ', len(pairs))
+    
     encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
     decoder = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
 
-    encoder.load_state_dict(torch.load('seq2seq_encoder.dict'))
-    decoder.load_state_dict(torch.load('seq2seq_decoder.dict'))
+    encoder.load_state_dict(torch.load(encoder_file))
+    decoder.load_state_dict(torch.load(decoder_file))
+
+    return encoder, decoder, input_lang, output_lang
     
-    evaluate_randomly(encoder1, attn_decoder1)
+
+def predict_dataset_seq2seq(dataset, corpus, encoder_file = 'seq2seq_encoder.dict', decoder_file = 'seq2seq_decoder.dict',
+                            out_file_name = 'wikidata//task1_wikidata_test_pred.json'):
+    """
+        only predict with the type is "others"
+    """
+    
+    encoder, decoder, input_lang, output_lang = load_seq2seq_model(encoder_file = encoder_file, decoder_file = decoder_file,
+                                                                   corpus = corpus)
+
+    data_list = []
+    for item in dataset:
+
+        if (item['category'] == 'resource' and item['type'][0] == 'others'):
+            question = item['question']
+            output = predict_single_sentence(encoder, decoder, input_lang, output_lang, question)
+            type_pred = output.replace('<EOS>', '')
+            type_pred = [t.strip() for t in type_pred.split(',') if t.strip() != '']
+            item['type'] = type_pred
+        
+        data_list.append(item)
+
+    # write dict
+    write_list_to_json_file(out_file_name, data_list, 'w')
+        
+        
+    
+    
+    
