@@ -1,0 +1,119 @@
+                             				precision    recall  f1-score   support
+
+                               Wikimedia article page       1.00      1.00      1.00        13
+                                  academic discipline       0.94      0.94      0.94        18
+                                       academic title       0.96      1.00      0.98        27
+                    administrative territorial entity       0.86      1.00      0.93        25
+administrative territorial entity of New York (state)       0.90      1.00      0.95         9
+                                                album       0.89      0.89      0.89        18
+                                          application       1.00      0.99      0.99        96
+                              architectural structure       1.00      1.00      1.00        22
+                                                  art       1.00      1.00      1.00        29
+                                            art genre       0.99      1.00      1.00       405
+                                            art style       1.00      1.00      1.00        10
+                                  astronomical object       1.00      0.98      0.99        54
+                                     audiovisual work       0.98      1.00      0.99       324
+                                                award       1.00      1.00      1.00        61
+                                       award ceremony       1.00      1.00      1.00        18
+                             biological macromolecule       1.00      1.00      1.00        17
+                                    biological region       0.94      1.00      0.97        16
+                                    branch of science       1.00      1.00      1.00         9
+                                                brand       1.00      1.00      1.00        61
+                                             building       1.00      1.00      1.00        18
+                                             business       1.00      0.93      0.96        28
+                                            causality       0.93      1.00      0.96        38
+                                                cause       0.96      1.00      0.98        22
+                                   chemical component       1.00      0.97      0.99        38
+                                   chemical substance       1.00      1.00      1.00        14
+                                                 city       0.96      0.95      0.96       197
+                                            city/town       0.95      0.99      0.97        94
+                                                class       0.99      0.99      0.99       145
+                                            community       0.97      0.95      0.96       367
+                                              concept       1.00      1.00      1.00       251
+                                              country       0.98      0.96      0.97       133
+                          county of the United States       0.94      0.94      0.94        33
+                                        creative work       0.99      1.00      0.99        85
+                                              disease       1.00      0.89      0.94        19
+                                                 drug       1.00      1.00      1.00        20
+                              educational institution       1.00      1.00      1.00        27
+                       election in the United Kingdom       1.00      1.00      1.00        14
+                                      federated state       0.97      0.97      0.97        38
+                                  fictional character       1.00      0.95      0.98        65
+                                                 film       1.00      0.93      0.97        30
+                                           film award       1.00      1.00      1.00        68
+       first-level administrative country subdivision       1.00      1.00      1.00        23
+                                        football club       1.00      0.98      0.99        46
+                                        form of state       1.00      1.00      1.00        23
+             former administrative territorial entity       1.00      0.85      0.92        27
+                                               gender       1.00      1.00      1.00       321
+                                                genre       1.00      0.97      0.98        62
+                                    geographic region       1.00      0.91      0.95        22
+                                           given name       1.00      0.94      0.97        17
+                                      group of humans       1.00      1.00      1.00        12
+                               group of living things       1.00      1.00      1.00        16
+                                       health problem       1.00      1.00      1.00        49
+                         higher education institution       0.96      0.96      0.96        28
+                                       human language       0.99      0.99      0.99       240
+                                     human settlement       0.97      0.96      0.96       174
+                                             ideology       0.97      1.00      0.99        36
+                                              isotope       1.00      1.00      1.00        18
+                                                  job       0.99      0.98      0.99       116
+                                  joint-stock company       0.89      1.00      0.94        17
+                                             landmass       0.91      1.00      0.95        20
+                                             languoid       0.98      1.00      0.99        96
+                                                 list       0.92      1.00      0.96        12
+                                living organism class       0.95      0.95      0.95        20
+                                     media enterprise       1.00      0.95      0.97        20
+                                    medicinal product       1.00      1.00      1.00        16
+                                                money       1.00      1.00      1.00        29
+                                         moving image       1.00      0.95      0.97        20
+                                         municipality       1.00      1.00      1.00        66
+                              municipality of Germany       0.93      1.00      0.96        13
+                                     musical ensemble       0.96      0.96      0.96        78
+                                        musical group       0.97      0.94      0.95        31
+                                         musical work       0.95      0.95      0.95        22
+                                 national sports team       0.91      1.00      0.95        10
+                                       natural person       0.99      1.00      0.99      1410
+                                  natural watercourse       1.00      1.00      1.00        25
+                        non-governmental organization       1.00      1.00      1.00        19
+                                           occupation       0.97      0.97      0.97        40
+                                             omnivore       0.99      0.99      0.99       259
+                                         organization       0.98      0.99      0.98        93
+                                               others       0.99      0.99      0.99      2333
+                                               person       0.97      0.98      0.98       268
+                                        personal data       1.00      1.00      1.00        24
+                         political territorial entity       0.99      1.00      0.99       869
+                                             position       1.00      1.00      1.00       315
+                      private educational institution       0.80      1.00      0.89         8
+                                   production company       0.96      1.00      0.98        22
+                                           profession       0.95      1.00      0.97        18
+                                       pure substance       1.00      0.95      0.97        20
+                                                 rank       1.00      0.94      0.97        16
+                                          recognition       1.00      1.00      1.00         9
+                                                 role       0.97      0.98      0.98       104
+                                               season       1.00      1.00      1.00        11
+                                                 seat       0.94      0.95      0.95       120
+                                     secondary school       1.00      0.93      0.97        15
+                                               series       1.00      0.89      0.94        18
+                              small Solar System body       1.00      1.00      1.00        15
+                                         social group       1.00      0.96      0.98        27
+                                     software company       0.99      1.00      0.99        71
+                                            specialty       0.96      1.00      0.98        23
+                                          sports club       0.92      1.00      0.96        23
+                                          sports team       1.00      0.93      0.96        28
+                                                state       0.99      0.95      0.97        81
+                                            technique       1.00      1.00      1.00        14
+                                   television program       0.98      1.00      0.99        60
+                                                 text       1.00      1.00      1.00        40
+                                        time standard       1.00      1.00      1.00        19
+                                            time zone       1.00      1.00      1.00        17
+                                                 tool       1.00      1.00      1.00        17
+                                                 type       0.92      0.92      0.92        13
+                                           university       0.97      0.97      0.97        31
+                                       visual artwork       1.00      0.97      0.99        34
+                                                  war       1.00      1.00      1.00        39
+                                                 work       0.98      0.96      0.97       137
+
+                                             accuracy                           0.98     11381
+                                            macro avg       0.98      0.98      0.98     11381
+                                         weighted avg       0.99      0.98      0.98     11381
